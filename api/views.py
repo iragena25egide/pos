@@ -106,11 +106,6 @@ class SaleViewSet(SoftDeleteModelViewSet):
         payment_amount = Decimal(request.data.get('payment_amount', '0.00'))
         confirm_loan = request.data.get('confirm_loan', False)
 
-        try:
-            customer = Customer.objects.get(id=customer_id, is_deleted=False)
-        except Customer.DoesNotExist:
-            return Response({'error': 'Customer not found.'}, status=status.HTTP_404_NOT_FOUND)
-
         if not items_data:
             return Response({'error': 'No items in sale.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -119,6 +114,17 @@ class SaleViewSet(SoftDeleteModelViewSet):
             total_amount += Decimal(item['quantity']) * Decimal(item['unit_price'])
 
         balance = total_amount - payment_amount
+
+        if balance > 0 and not customer_id:
+            return Response({'error': 'A customer must be selected for loan sales.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if customer_id:
+            try:
+                customer = Customer.objects.get(id=customer_id, is_deleted=False)
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found.'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            customer, _ = Customer.objects.get_or_create(name='Walk-in Customer', defaults={'phone': 'N/A'})
 
         existing_loan = Loan.objects.filter(customer=customer, is_deleted=False).first()
 
