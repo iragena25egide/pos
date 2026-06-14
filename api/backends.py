@@ -18,7 +18,7 @@ class EmailAuthBackend(ModelBackend):
         except User.DoesNotExist:
             return None
         except User.MultipleObjectsReturned:
-            # If multiple users have the same email, get the first one
+
             user = User.objects.filter(
                 Q(username__iexact=username) | Q(email__iexact=username)).first()
 
