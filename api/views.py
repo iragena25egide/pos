@@ -180,12 +180,15 @@ class LoanViewSet(SoftDeleteModelViewSet):
             return Response({'error': 'Payment must be greater than 0.'}, status=status.HTTP_400_BAD_REQUEST)
         
         if payment >= loan.total_debt:
-            loan.soft_delete()
-            return Response({'message': 'Loan fully settled and removed.'})
+            loan.total_debt = Decimal('0.00')
+            loan.status = 'Paid'
+            loan.save()
+            return Response({'message': 'Loan fully settled.', 'status': loan.status, 'remaining_debt': loan.total_debt})
         else:
             loan.total_debt -= payment
+            loan.status = 'Pending'
             loan.save()
-            return Response({'message': 'Partial payment received.', 'remaining_debt': loan.total_debt})
+            return Response({'message': 'Partial payment received.', 'status': loan.status, 'remaining_debt': loan.total_debt})
 
 class TrashView(views.APIView):
     def get(self, request):

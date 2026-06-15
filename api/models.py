@@ -85,8 +85,13 @@ class SaleItem(models.Model):
         return f"{self.quantity} x {self.product.name}"
 
 class Loan(SoftDeleteModel):
+    STATUS_CHOICES = [
+        ('Pending', 'Pending'),
+        ('Paid', 'Paid'),
+    ]
     customer = models.OneToOneField(Customer, related_name='loan', on_delete=models.CASCADE)
     total_debt = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
