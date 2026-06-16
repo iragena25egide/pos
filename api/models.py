@@ -30,6 +30,7 @@ class User(AbstractUser):
 
 class Company(SoftDeleteModel):
     name = models.CharField(max_length=255)
+    ceo_founder = models.CharField(max_length=255, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     contact_email = models.EmailField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -52,6 +53,7 @@ class Customer(SoftDeleteModel):
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -94,6 +96,13 @@ class Loan(SoftDeleteModel):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.total_debt is not None and self.total_debt > 0:
+            self.status = 'Pending'
+        else:
+            self.status = 'Paid'
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Loan - {self.customer.name} - ${self.total_debt}"

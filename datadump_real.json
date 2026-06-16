@@ -1,0 +1,842 @@
+[
+{
+    "model": "api.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$zHnG1s7yLFMIs4d5JbdsAf$L9l2LIRw3YuhsgWDwyAAM4f1GkXHgEUWa7p+2KCu4tU=",
+        "last_login": null,
+        "is_superuser": true,
+        "username": "admin",
+        "first_name": "",
+        "last_name": "",
+        "email": "admin@example.com",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-06-12T16:00:00.059Z",
+        "role": "cashier",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "api.user",
+    "fields": {
+        "password": "pbkdf2_sha256$600000$DhlvAGo5Psuijd8ryxsyD6$Xmw3vp43ujXczTqY8zT1VnYiT9X+g3APSL8ZrnfVWf8=",
+        "last_login": null,
+        "is_superuser": false,
+        "username": "egide iragena",
+        "first_name": "Iragena",
+        "last_name": "Egide",
+        "email": "iragenaegide205@gmail.com",
+        "is_staff": false,
+        "is_active": true,
+        "date_joined": "2026-06-12T21:01:11.488Z",
+        "role": "admin",
+        "groups": [],
+        "user_permissions": []
+    }
+},
+{
+    "model": "api.company",
+    "pk": 1,
+    "fields": {
+        "is_deleted": true,
+        "deleted_at": "2026-06-13T19:53:54.710Z",
+        "name": "Apple Inc",
+        "address": null,
+        "contact_email": "contact@appleinc.com",
+        "created_at": "2026-06-12T18:16:16.325Z"
+    }
+},
+{
+    "model": "api.company",
+    "pk": 2,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Samsung Electronics",
+        "address": null,
+        "contact_email": "contact@samsungelectronics.com",
+        "created_at": "2026-06-12T18:16:16.350Z"
+    }
+},
+{
+    "model": "api.company",
+    "pk": 3,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Sony",
+        "address": null,
+        "contact_email": "contact@sony.com",
+        "created_at": "2026-06-12T18:16:16.351Z"
+    }
+},
+{
+    "model": "api.company",
+    "pk": 4,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "LG",
+        "address": null,
+        "contact_email": "contact@lg.com",
+        "created_at": "2026-06-12T18:16:16.352Z"
+    }
+},
+{
+    "model": "api.company",
+    "pk": 5,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Microsoft",
+        "address": null,
+        "contact_email": "contact@microsoft.com",
+        "created_at": "2026-06-12T18:16:16.352Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 1,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 1,
+        "name": "MacBook Pro 16",
+        "description": null,
+        "price": "2500.00",
+        "stock_quantity": 25,
+        "created_at": "2026-06-12T18:16:16.354Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 2,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 1,
+        "name": "iPhone 15 Pro",
+        "description": null,
+        "price": "999.00",
+        "stock_quantity": 38,
+        "created_at": "2026-06-12T18:16:16.368Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 3,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 2,
+        "name": "Galaxy S24 Ultra",
+        "description": null,
+        "price": "1200.00",
+        "stock_quantity": 29,
+        "created_at": "2026-06-12T18:16:16.370Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 4,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 3,
+        "name": "PlayStation 5",
+        "description": null,
+        "price": "450.00",
+        "stock_quantity": 44,
+        "created_at": "2026-06-12T18:16:16.374Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 5,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 4,
+        "name": "LG OLED TV 65",
+        "description": null,
+        "price": "1500.00",
+        "stock_quantity": 17,
+        "created_at": "2026-06-12T18:16:16.375Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 6,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 5,
+        "name": "Surface Pro 9",
+        "description": null,
+        "price": "1000.00",
+        "stock_quantity": 29,
+        "created_at": "2026-06-12T18:16:16.377Z"
+    }
+},
+{
+    "model": "api.product",
+    "pk": 7,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "company": 1,
+        "name": "AirPods Pro",
+        "description": null,
+        "price": "200.00",
+        "stock_quantity": 6,
+        "created_at": "2026-06-12T18:16:16.378Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 1,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Alice Smith",
+        "phone": "+1-555-9793",
+        "email": "alice@example.com",
+        "created_at": "2026-06-12T18:16:16.379Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 2,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Bob Jones",
+        "phone": "+1-555-6056",
+        "email": "bob@example.com",
+        "created_at": "2026-06-12T18:16:16.381Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 3,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Charlie Brown",
+        "phone": "+1-555-6884",
+        "email": "charlie@example.com",
+        "created_at": "2026-06-12T18:16:16.382Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 4,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Diana Prince",
+        "phone": "+1-555-9496",
+        "email": "diana@example.com",
+        "created_at": "2026-06-12T18:16:16.382Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 5,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Egide N",
+        "phone": "+1-555-4493",
+        "email": "egide@example.com",
+        "created_at": "2026-06-12T18:16:16.383Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 6,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "Walk-in Customer",
+        "phone": "N/A",
+        "email": null,
+        "created_at": "2026-06-13T19:46:40.750Z"
+    }
+},
+{
+    "model": "api.customer",
+    "pk": 7,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "name": "kidd",
+        "phone": null,
+        "email": null,
+        "created_at": "2026-06-13T19:53:01.358Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 1,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 2,
+        "user": null,
+        "total_amount": "450.00",
+        "payment_amount": "129.35",
+        "created_at": "2026-05-16T18:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 2,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "user": null,
+        "total_amount": "1000.00",
+        "payment_amount": "1000.00",
+        "created_at": "2026-05-28T07:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 3,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "user": null,
+        "total_amount": "7500.00",
+        "payment_amount": "2579.23",
+        "created_at": "2026-05-28T22:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 4,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "user": null,
+        "total_amount": "1200.00",
+        "payment_amount": "1200.00",
+        "created_at": "2026-05-29T00:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 5,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "user": null,
+        "total_amount": "1200.00",
+        "payment_amount": "1200.00",
+        "created_at": "2026-05-23T17:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 6,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "user": null,
+        "total_amount": "1200.00",
+        "payment_amount": "1200.00",
+        "created_at": "2026-06-04T11:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 7,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "user": null,
+        "total_amount": "1998.00",
+        "payment_amount": "1228.48",
+        "created_at": "2026-06-12T10:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 8,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "user": null,
+        "total_amount": "999.00",
+        "payment_amount": "999.00",
+        "created_at": "2026-05-14T08:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 9,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "user": null,
+        "total_amount": "2500.00",
+        "payment_amount": "2500.00",
+        "created_at": "2026-06-04T17:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 10,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "user": null,
+        "total_amount": "1998.00",
+        "payment_amount": "1998.00",
+        "created_at": "2026-05-23T00:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 11,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "user": null,
+        "total_amount": "7500.00",
+        "payment_amount": "7500.00",
+        "created_at": "2026-05-31T17:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 12,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 1,
+        "user": null,
+        "total_amount": "1350.00",
+        "payment_amount": "1350.00",
+        "created_at": "2026-06-11T04:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 13,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "user": null,
+        "total_amount": "400.00",
+        "payment_amount": "73.15",
+        "created_at": "2026-06-11T23:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 14,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 2,
+        "user": null,
+        "total_amount": "999.00",
+        "payment_amount": "648.53",
+        "created_at": "2026-05-13T14:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 15,
+    "fields": {
+        "is_deleted": true,
+        "deleted_at": "2026-06-12T21:03:41.159Z",
+        "customer": 5,
+        "user": null,
+        "total_amount": "1998.00",
+        "payment_amount": "540.79",
+        "created_at": "2026-06-12T15:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 16,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "user": null,
+        "total_amount": "2400.00",
+        "payment_amount": "2400.00",
+        "created_at": "2026-05-19T06:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 17,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "user": null,
+        "total_amount": "4500.00",
+        "payment_amount": "4500.00",
+        "created_at": "2026-06-07T07:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 18,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "user": null,
+        "total_amount": "3000.00",
+        "payment_amount": "432.72",
+        "created_at": "2026-05-16T19:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 19,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 2,
+        "user": null,
+        "total_amount": "3000.00",
+        "payment_amount": "3000.00",
+        "created_at": "2026-06-01T07:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 20,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "user": null,
+        "total_amount": "200.00",
+        "payment_amount": "200.00",
+        "created_at": "2026-05-28T04:16:16.384Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 21,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 6,
+        "user": [
+            "egide iragena"
+        ],
+        "total_amount": "600.00",
+        "payment_amount": "600.00",
+        "created_at": "2026-06-13T19:46:40.774Z"
+    }
+},
+{
+    "model": "api.sale",
+    "pk": 22,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 7,
+        "user": [
+            "egide iragena"
+        ],
+        "total_amount": "400.00",
+        "payment_amount": "400.00",
+        "created_at": "2026-06-13T19:53:01.364Z"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 1,
+    "fields": {
+        "sale": 1,
+        "product": 4,
+        "quantity": 1,
+        "unit_price": "450.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 2,
+    "fields": {
+        "sale": 2,
+        "product": 6,
+        "quantity": 1,
+        "unit_price": "1000.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 3,
+    "fields": {
+        "sale": 3,
+        "product": 1,
+        "quantity": 3,
+        "unit_price": "2500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 4,
+    "fields": {
+        "sale": 4,
+        "product": 3,
+        "quantity": 1,
+        "unit_price": "1200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 5,
+    "fields": {
+        "sale": 5,
+        "product": 3,
+        "quantity": 1,
+        "unit_price": "1200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 6,
+    "fields": {
+        "sale": 6,
+        "product": 3,
+        "quantity": 1,
+        "unit_price": "1200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 7,
+    "fields": {
+        "sale": 7,
+        "product": 2,
+        "quantity": 2,
+        "unit_price": "999.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 8,
+    "fields": {
+        "sale": 8,
+        "product": 2,
+        "quantity": 1,
+        "unit_price": "999.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 9,
+    "fields": {
+        "sale": 9,
+        "product": 1,
+        "quantity": 1,
+        "unit_price": "2500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 10,
+    "fields": {
+        "sale": 10,
+        "product": 2,
+        "quantity": 2,
+        "unit_price": "999.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 11,
+    "fields": {
+        "sale": 11,
+        "product": 1,
+        "quantity": 3,
+        "unit_price": "2500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 12,
+    "fields": {
+        "sale": 12,
+        "product": 4,
+        "quantity": 3,
+        "unit_price": "450.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 13,
+    "fields": {
+        "sale": 13,
+        "product": 7,
+        "quantity": 2,
+        "unit_price": "200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 14,
+    "fields": {
+        "sale": 14,
+        "product": 2,
+        "quantity": 1,
+        "unit_price": "999.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 15,
+    "fields": {
+        "sale": 15,
+        "product": 2,
+        "quantity": 2,
+        "unit_price": "999.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 16,
+    "fields": {
+        "sale": 16,
+        "product": 3,
+        "quantity": 2,
+        "unit_price": "1200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 17,
+    "fields": {
+        "sale": 17,
+        "product": 5,
+        "quantity": 3,
+        "unit_price": "1500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 18,
+    "fields": {
+        "sale": 18,
+        "product": 5,
+        "quantity": 2,
+        "unit_price": "1500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 19,
+    "fields": {
+        "sale": 19,
+        "product": 5,
+        "quantity": 2,
+        "unit_price": "1500.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 20,
+    "fields": {
+        "sale": 20,
+        "product": 7,
+        "quantity": 1,
+        "unit_price": "200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 21,
+    "fields": {
+        "sale": 21,
+        "product": 7,
+        "quantity": 3,
+        "unit_price": "200.00"
+    }
+},
+{
+    "model": "api.saleitem",
+    "pk": 22,
+    "fields": {
+        "sale": 22,
+        "product": 7,
+        "quantity": 2,
+        "unit_price": "200.00"
+    }
+},
+{
+    "model": "api.loan",
+    "pk": 1,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 2,
+        "total_debt": "671.12",
+        "status": "Pending",
+        "created_at": "2026-06-12T18:16:16.397Z",
+        "updated_at": "2026-06-12T18:16:16.459Z"
+    }
+},
+{
+    "model": "api.loan",
+    "pk": 2,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 5,
+        "total_debt": "8945.26",
+        "status": "Pending",
+        "created_at": "2026-06-12T18:16:16.407Z",
+        "updated_at": "2026-06-12T18:16:16.476Z"
+    }
+},
+{
+    "model": "api.loan",
+    "pk": 3,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 4,
+        "total_debt": "769.52",
+        "status": "Pending",
+        "created_at": "2026-06-12T18:16:16.427Z",
+        "updated_at": "2026-06-12T18:16:16.428Z"
+    }
+},
+{
+    "model": "api.loan",
+    "pk": 4,
+    "fields": {
+        "is_deleted": false,
+        "deleted_at": null,
+        "customer": 3,
+        "total_debt": "326.85",
+        "status": "Pending",
+        "created_at": "2026-06-12T18:16:16.453Z",
+        "updated_at": "2026-06-12T18:16:16.454Z"
+    }
+}
+]

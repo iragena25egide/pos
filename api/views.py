@@ -103,6 +103,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
     def create(self, request, *args, **kwargs):
         customer_id = request.data.get('customer_id')
         customer_name = request.data.get('customer_name')
+        customer_address = request.data.get('customer_address')
         items_data = request.data.get('items', [])
         payment_amount = Decimal(request.data.get('payment_amount', '0.00'))
         confirm_loan = request.data.get('confirm_loan', False)
@@ -119,12 +120,18 @@ class SaleViewSet(SoftDeleteModelViewSet):
         if customer_id:
             try:
                 customer = Customer.objects.get(id=customer_id, is_deleted=False)
+                if customer_address and not customer.address:
+                    customer.address = customer_address
+                    customer.save()
             except Customer.DoesNotExist:
                 return Response({'error': 'Customer not found.'}, status=status.HTTP_404_NOT_FOUND)
         elif customer_name:
             customer = Customer.objects.filter(name=customer_name, is_deleted=False).first()
             if not customer:
-                customer = Customer.objects.create(name=customer_name)
+                customer = Customer.objects.create(name=customer_name, address=customer_address)
+            elif customer_address and not customer.address:
+                customer.address = customer_address
+                customer.save()
         else:
             return Response({'error': 'Customer name is required.'}, status=status.HTTP_400_BAD_REQUEST)
 

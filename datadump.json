@@ -1,0 +1,20 @@
+[
+{
+    "model": "api.user",
+    "fields": {
+        "password": "pbkdf2_sha256$1000000$a5qe7a4ROGYL8ZK8YWm0xn$dLk4J/hUpIgmfUjR8/8V3maQoRRtvEFgtIc5ZkI6XqI=",
+        "last_login": null,
+        "is_superuser": true,
+        "username": "admin",
+        "first_name": "",
+        "last_name": "",
+        "email": "admin@example.com",
+        "is_staff": true,
+        "is_active": true,
+        "date_joined": "2026-06-12T15:47:49.664Z",
+        "role": "cashier",
+        "groups": [],
+        "user_permissions": []
+    }
+}
+]
