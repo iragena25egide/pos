@@ -252,12 +252,12 @@ class RevenueReportView(views.APIView):
         if end_date:
             sales_query = sales_query.filter(sale__created_at__lte=end_date)
 
-        from django.db.models import F
+        from django.db.models import F, Sum, DecimalField
         company_stats = sales_query.values(
             company_id=F('product__company__id'),
             company_name=F('product__company__name')
         ).annotate(
-            total_sales_value=Sum(F('quantity') * F('unit_price')),
+            total_sales_value=Sum(F('quantity') * F('unit_price'), output_field=DecimalField()),
             items_sold=Sum('quantity')
         )
 
