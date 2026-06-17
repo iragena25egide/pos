@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, F
 from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
 from .serializers import (
     UserSerializer, CompanySerializer, ProductSerializer,
@@ -99,6 +99,16 @@ class SaleViewSet(SoftDeleteModelViewSet):
     queryset = Sale.objects.all().order_by('-created_at')
     serializer_class = SaleSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        return queryset
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         customer_id = request.data.get('customer_id')
@@ -175,17 +185,52 @@ class SaleViewSet(SoftDeleteModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class LoanViewSet(SoftDeleteModelViewSet):
-    queryset = Loan.objects.all()
+    queryset = Loan.objects.all().order_by('-created_at')
     serializer_class = LoanSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+        return queryset
+
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def settle(self, request, pk=None):
         loan = self.get_object()
         payment = Decimal(request.data.get('payment_amount', '0.00'))
         
         if payment <= 0:
             return Response({'error': 'Payment must be greater than 0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Distribute the payment across unpaid sales (oldest first)
+        unpaid_sales = Sale.objects.filter(
+            customer=loan.customer,
+            is_deleted=False
+        ).exclude(
+            payment_amount__gte=F('total_amount')
+        ).order_by('created_at')
+
+        remaining_payment = payment
+        for sale in unpaid_sales:
+            if remaining_payment <= 0:
+                break
+                
+            sale_balance = sale.total_amount - sale.payment_amount
+            if remaining_payment >= sale_balance:
+                sale.payment_amount += sale_balance
+                remaining_payment -= sale_balance
+            else:
+                sale.payment_amount += remaining_payment
+                remaining_payment = Decimal('0.00')
+            
+            sale.save()
         
+        # Update the loan itself
         if payment >= loan.total_debt:
             loan.total_debt = Decimal('0.00')
             loan.status = 'Paid'
