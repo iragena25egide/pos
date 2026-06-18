@@ -96,7 +96,7 @@ class CustomerViewSet(SoftDeleteModelViewSet):
         return Response(serializer.data)
 
 class SaleViewSet(SoftDeleteModelViewSet):
-    queryset = Sale.objects.all().order_by('-created_at')
+    queryset = Sale.objects.select_related('customer', 'user').prefetch_related('items__product').all().order_by('-created_at')
     serializer_class = SaleSerializer
 
     def get_queryset(self):
@@ -145,7 +145,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
         else:
             return Response({'error': 'Customer name is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        existing_loan = Loan.objects.filter(customer=customer, is_deleted=False).first()
+        existing_loan = Loan.objects.select_for_update().filter(customer=customer, is_deleted=False).first()
 
         if balance > 0 and existing_loan and existing_loan.total_debt > 0 and not confirm_loan:
             return Response({
@@ -163,7 +163,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
         )
 
         for item in items_data:
-            product = Product.objects.get(id=item['product_id'])
+            product = Product.objects.select_for_update().get(id=item['product_id'])
             qty = int(item['quantity'])
             SaleItem.objects.create(
                 sale=sale,
@@ -185,7 +185,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class LoanViewSet(SoftDeleteModelViewSet):
-    queryset = Loan.objects.all().order_by('-created_at')
+    queryset = Loan.objects.select_related('customer').all().order_by('-created_at')
     serializer_class = LoanSerializer
 
     def get_queryset(self):
