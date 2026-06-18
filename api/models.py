@@ -1,9 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
+from simple_history.models import HistoricalRecords
 
 class SoftDeleteModel(models.Model):
-    is_deleted = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False, db_index=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -29,32 +30,33 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='cashier')
 
 class Company(SoftDeleteModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, db_index=True)
     ceo_founder = models.CharField(max_length=255, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     contact_email = models.EmailField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return self.name
 
 class Product(SoftDeleteModel):
     company = models.ForeignKey(Company, related_name='products', on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, db_index=True)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     stock_quantity = models.IntegerField(default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    history = HistoricalRecords()
 
     def __str__(self):
         return f"{self.name} - {self.company.name}"
 
 class Customer(SoftDeleteModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, db_index=True)
     phone = models.CharField(max_length=50, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     def __str__(self):
         return self.name
@@ -64,7 +66,8 @@ class Sale(SoftDeleteModel):
     user = models.ForeignKey(User, related_name='sales', on_delete=models.SET_NULL, null=True)
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    history = HistoricalRecords()
 
     @property
     def balance(self):
@@ -93,9 +96,10 @@ class Loan(SoftDeleteModel):
     ]
     customer = models.OneToOneField(Customer, related_name='loan', on_delete=models.CASCADE)
     total_debt = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-    created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
 
     def save(self, *args, **kwargs):
         if self.total_debt is not None and self.total_debt > 0:
