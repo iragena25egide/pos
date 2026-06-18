@@ -184,6 +184,85 @@ class SaleViewSet(SoftDeleteModelViewSet):
         serializer = self.get_serializer(sale)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        sale = self.get_object()
+        
+        # 1. Reverse old sale items impact on stock
+        old_items = sale.items.all()
+        for item in old_items:
+            product = Product.objects.select_for_update().get(id=item.product_id)
+            product.stock_quantity += item.quantity
+            product.save()
+
+        # 2. Reverse old sale impact on loan
+        old_balance = sale.balance
+        if old_balance > 0:
+            loan = Loan.objects.select_for_update().filter(customer=sale.customer, is_deleted=False).first()
+            if loan:
+                loan.total_debt -= old_balance
+                if loan.total_debt < 0:
+                    loan.total_debt = Decimal('0.00')
+                loan.save()
+
+        # 3. Delete old items
+        old_items.delete()
+
+        # 4. Process new data
+        customer_id = request.data.get('customer_id', sale.customer_id)
+        items_data = request.data.get('items', [])
+        payment_amount = Decimal(str(request.data.get('payment_amount', sale.payment_amount)))
+        
+        if not items_data:
+            return Response({'error': 'No items in sale.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if customer_id != sale.customer_id:
+            try:
+                sale.customer = Customer.objects.get(id=customer_id, is_deleted=False)
+            except Customer.DoesNotExist:
+                return Response({'error': 'Customer not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        total_amount = Decimal('0.00')
+        for item in items_data:
+            total_amount += Decimal(str(item['quantity'])) * Decimal(str(item['unit_price']))
+
+        new_balance = total_amount - payment_amount
+
+        sale.total_amount = total_amount
+        sale.payment_amount = payment_amount
+        sale.save()
+
+        # 5. Apply new items and deduct stock
+        for item in items_data:
+            product_id = item.get('product_id')
+            if not product_id and 'product' in item:
+                product_id = item['product']
+                
+            product = Product.objects.select_for_update().get(id=product_id)
+            qty = int(item['quantity'])
+            unit_price = Decimal(str(item['unit_price']))
+            
+            SaleItem.objects.create(
+                sale=sale,
+                product=product,
+                quantity=qty,
+                unit_price=unit_price
+            )
+            product.stock_quantity -= qty
+            product.save()
+
+        # 6. Apply new loan balance
+        if new_balance > 0:
+            loan = Loan.objects.select_for_update().filter(customer=sale.customer, is_deleted=False).first()
+            if loan:
+                loan.total_debt += new_balance
+                loan.save()
+            else:
+                Loan.objects.create(customer=sale.customer, total_debt=new_balance)
+
+        serializer = self.get_serializer(sale)
+        return Response(serializer.data)
+
 class LoanViewSet(SoftDeleteModelViewSet):
     queryset = Loan.objects.select_related('customer').all().order_by('-created_at')
     serializer_class = LoanSerializer
