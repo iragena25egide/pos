@@ -377,12 +377,26 @@ class RevenueReportView(views.APIView):
             sales_query = sales_query.filter(sale__created_at__lte=end_date)
 
         from django.db.models import F, Sum, DecimalField
-        company_stats = sales_query.values(
+        
+        company_stats = list(sales_query.values(
             company_id=F('product__company__id'),
             company_name=F('product__company__name')
         ).annotate(
             total_sales_value=Sum(F('quantity') * F('unit_price'), output_field=DecimalField()),
             items_sold=Sum('quantity')
-        )
+        ))
 
-        return Response(list(company_stats))
+        product_stats = list(sales_query.values(
+            company_id=F('product__company__id'),
+            product_id=F('product__id'),
+            product_name=F('product__name')
+        ).annotate(
+            total_sales_value=Sum(F('quantity') * F('unit_price'), output_field=DecimalField()),
+            items_sold=Sum('quantity')
+        ))
+
+        # Nest product stats into the corresponding company
+        for c in company_stats:
+            c['products'] = [p for p in product_stats if p['company_id'] == c['company_id']]
+
+        return Response(company_stats)
