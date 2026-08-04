@@ -8,4 +8,5 @@ pip install -r requirements.txt
 echo "Running database migrations..."
 python manage.py migrate
 
+# All steps finished
 echo "Build script completed successfully."
