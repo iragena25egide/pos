@@ -15,4 +15,5 @@ try:
     print("Admin updated: admin / Nexus@admin! (email: admin@nexus.rw)")
 except User.DoesNotExist:
     User.objects.create_superuser('admin', 'admin@nexus.rw', 'Nexus@admin!')
+    # Print a success message for creating the superuser
     print("Created superuser: admin / Nexus@admin! (email: admin@nexus.rw)")
