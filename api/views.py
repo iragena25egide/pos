@@ -364,8 +364,8 @@ class DashboardStatsView(views.APIView):
         total_revenue = Sale.objects.filter(is_deleted=False).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
         total_outstanding_loans = Loan.objects.filter(is_deleted=False).aggregate(total=Sum('total_debt'))['total'] or Decimal('0.00')
 
-        recent_sales = SaleSerializer(Sale.objects.filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
-        recent_loans = LoanSerializer(Loan.objects.filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
+        recent_sales = SaleSerializer(Sale.objects.select_related('customer', 'user').prefetch_related('items__product').filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
+        recent_loans = LoanSerializer(Loan.objects.select_related('customer').filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
 
         return Response({
             'total_companies': total_companies,
