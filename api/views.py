@@ -358,6 +358,14 @@ class TrashView(views.APIView):
         trash.sort(key=lambda x: x['deleted_at'] or timezone.now(), reverse=True)
         return Response(trash)
 
+    def delete(self, request):
+        Company.objects.filter(is_deleted=True).delete()
+        Product.objects.filter(is_deleted=True).delete()
+        Customer.objects.filter(is_deleted=True).delete()
+        Sale.objects.filter(is_deleted=True).delete()
+        Loan.objects.filter(is_deleted=True).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class DashboardStatsView(views.APIView):
     def get(self, request):
         total_companies = Company.objects.filter(is_deleted=False).count()
