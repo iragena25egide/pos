@@ -444,4 +444,25 @@ class RevenueReportView(views.APIView):
         for c in company_stats:
             c['products'] = [p for p in product_stats if p['company_id'] == c['company_id']]
 
+        if request.query_params.get('export') == 'csv':
+            import csv
+            from django.http import HttpResponse
+
+            response = HttpResponse(content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="revenue_report.csv"'
+
+            writer = csv.writer(response)
+            writer.writerow(['Company Name', 'Product Name', 'Total Sales Value', 'Items Sold'])
+
+            for c in company_stats:
+                for p in c['products']:
+                    writer.writerow([
+                        c['company_name'],
+                        p['product_name'],
+                        p['total_sales_value'],
+                        p['items_sold']
+                    ])
+
+            return response
+
         return Response(company_stats)
