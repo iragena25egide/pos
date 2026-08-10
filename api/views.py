@@ -7,9 +7,14 @@ from django.db.models import Sum, Count, F
 from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
 from .serializers import (
     UserSerializer, CompanySerializer, ProductSerializer,
-    CustomerSerializer, SaleSerializer, LoanSerializer
+    CustomerSerializer, SaleSerializer, LoanSerializer,
+    CustomTokenObtainPairSerializer
 )
+from rest_framework_simplejwt.views import TokenObtainPairView
 from decimal import Decimal
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 class SoftDeleteModelViewSet(viewsets.ModelViewSet):
     def get_queryset(self):

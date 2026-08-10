@@ -1,13 +1,22 @@
 from rest_framework import serializers
 from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
 from django.contrib.auth import get_user_model
-
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 User = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'role', 'first_name', 'last_name']
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['username'] = user.username
+        token['email'] = user.email
+        token['role'] = getattr(user, 'role', '')
+        return token
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
