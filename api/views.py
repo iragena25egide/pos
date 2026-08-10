@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, views
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum, Count, F
 from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
@@ -170,6 +171,10 @@ class SaleViewSet(SoftDeleteModelViewSet):
         for item in items_data:
             product = Product.objects.select_for_update().get(id=item['product_id'])
             qty = int(item['quantity'])
+            
+            if product.stock_quantity < qty:
+                raise ValidationError({'error': f"Insufficient stock for {product.name}. Available: {product.stock_quantity}"})
+                
             SaleItem.objects.create(
                 sale=sale,
                 product=product,
@@ -246,6 +251,9 @@ class SaleViewSet(SoftDeleteModelViewSet):
             product = Product.objects.select_for_update().get(id=product_id)
             qty = int(item['quantity'])
             unit_price = Decimal(str(item['unit_price']))
+            
+            if product.stock_quantity < qty:
+                raise ValidationError({'error': f"Insufficient stock for {product.name}. Available: {product.stock_quantity}"})
             
             SaleItem.objects.create(
                 sale=sale,
