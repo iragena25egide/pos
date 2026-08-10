@@ -1,4 +1,5 @@
-from rest_framework import viewsets, status, views
+from rest_framework import viewsets, status, views, filters
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -86,6 +87,9 @@ class CompanyViewSet(SoftDeleteModelViewSet):
 class ProductViewSet(SoftDeleteModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['company']
+    search_fields = ['name', 'description']
 
 class CustomerViewSet(SoftDeleteModelViewSet):
     queryset = Customer.objects.all()

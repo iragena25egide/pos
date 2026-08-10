@@ -1,7 +1,8 @@
 asgiref==3.11.1
 dj-database-url==3.1.2
-Django==4.2.10
+Django==5.2.17
 django-cors-headers==4.3.1
+django-filter==26.1
 django-simple-history==3.11.0
 djangorestframework==3.15.1
 djangorestframework-simplejwt==5.3.1
