@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     UserViewSet, CompanyViewSet, ProductViewSet, 
     CustomerViewSet, SaleViewSet, LoanViewSet,
-    DashboardStatsView, RevenueReportView, TrashView,
+    PaymentViewSet, DashboardStatsView, RevenueReportView, TrashView,
     CustomTokenObtainPairView
 )
 
@@ -15,6 +15,7 @@ router.register(r'products', ProductViewSet)
 router.register(r'customers', CustomerViewSet)
 router.register(r'sales', SaleViewSet)
 router.register(r'loans', LoanViewSet)
+router.register(r'payments', PaymentViewSet)
 
 urlpatterns = [
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),

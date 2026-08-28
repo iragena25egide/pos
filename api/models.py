@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+
 class SoftDeleteModel(models.Model):
     is_deleted = models.BooleanField(default=False, db_index=True)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -20,14 +21,17 @@ class SoftDeleteModel(models.Model):
         self.deleted_at = None
         self.save()
 
+
 class User(AbstractUser):
-    # We can add custom roles here if needed
+
     ROLE_CHOICES = (
         ('admin', 'Admin'),
         ('manager', 'Manager'),
         ('cashier', 'Cashier'),
     )
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='cashier')
+    role = models.CharField(
+        max_length=20, choices=ROLE_CHOICES, default='cashier')
+
 
 class Company(SoftDeleteModel):
     name = models.CharField(max_length=255, db_index=True)
@@ -39,8 +43,10 @@ class Company(SoftDeleteModel):
     def __str__(self):
         return self.name
 
+
 class Product(SoftDeleteModel):
-    company = models.ForeignKey(Company, related_name='products', on_delete=models.CASCADE)
+    company = models.ForeignKey(
+        Company, related_name='products', on_delete=models.CASCADE)
     name = models.CharField(max_length=255, db_index=True)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -50,6 +56,7 @@ class Product(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.name} - {self.company.name}"
+
 
 class Customer(SoftDeleteModel):
     name = models.CharField(max_length=255, db_index=True)
@@ -61,11 +68,16 @@ class Customer(SoftDeleteModel):
     def __str__(self):
         return self.name
 
+
 class Sale(SoftDeleteModel):
-    customer = models.ForeignKey(Customer, related_name='sales', on_delete=models.CASCADE)
-    user = models.ForeignKey(User, related_name='sales', on_delete=models.SET_NULL, null=True)
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    customer = models.ForeignKey(
+        Customer, related_name='sales', on_delete=models.CASCADE)
+    user = models.ForeignKey(User, related_name='sales',
+                             on_delete=models.SET_NULL, null=True)
+    total_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00)
+    payment_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     history = HistoricalRecords()
 
@@ -76,8 +88,10 @@ class Sale(SoftDeleteModel):
     def __str__(self):
         return f"Sale {self.id} - {self.customer.name}"
 
+
 class SaleItem(models.Model):
-    sale = models.ForeignKey(Sale, related_name='items', on_delete=models.CASCADE)
+    sale = models.ForeignKey(Sale, related_name='items',
+                             on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     quantity = models.IntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -89,14 +103,18 @@ class SaleItem(models.Model):
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
 
+
 class Loan(SoftDeleteModel):
     STATUS_CHOICES = [
         ('Pending', 'Pending'),
         ('Paid', 'Paid'),
     ]
-    customer = models.OneToOneField(Customer, related_name='loan', on_delete=models.CASCADE)
-    total_debt = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending', db_index=True)
+    customer = models.OneToOneField(
+        Customer, related_name='loan', on_delete=models.CASCADE)
+    total_debt = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0.00)
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='Pending', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     history = HistoricalRecords()
@@ -110,3 +128,19 @@ class Loan(SoftDeleteModel):
 
     def __str__(self):
         return f"Loan - {self.customer.name} - ${self.total_debt}"
+
+
+class Payment(SoftDeleteModel):
+    PAYMENT_TYPE_CHOICES = (
+        ('SALE', 'Sale'),
+        ('LOAN_PAYMENT', 'Loan Payment'),
+    )
+    customer = models.ForeignKey(Customer, related_name='payments', on_delete=models.CASCADE, null=True, blank=True)
+    client_name = models.CharField(max_length=255, db_index=True)
+    amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    payment_type = models.CharField(max_length=20, choices=PAYMENT_TYPE_CHOICES, default='SALE')
+    date = models.DateTimeField(auto_now_add=True, db_index=True)
+    history = HistoricalRecords()
+
+    def __str__(self):
+        return f"{self.client_name} - ${self.amount} on {self.date.strftime('%Y-%m-%d %H:%M')}"

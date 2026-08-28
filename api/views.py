@@ -6,11 +6,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum, Count, F
-from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
+from .models import User, Company, Product, Customer, Sale, SaleItem, Loan, Payment
 from .serializers import (
     UserSerializer, CompanySerializer, ProductSerializer,
     CustomerSerializer, SaleSerializer, LoanSerializer,
-    CustomTokenObtainPairSerializer
+    CustomTokenObtainPairSerializer, PaymentSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView
 from decimal import Decimal
@@ -196,6 +196,14 @@ class SaleViewSet(SoftDeleteModelViewSet):
             else:
                 Loan.objects.create(customer=customer, total_debt=balance)
 
+        if payment_amount > 0:
+            Payment.objects.create(
+                customer=customer,
+                client_name=customer.name,
+                amount=payment_amount,
+                payment_type='SALE'
+            )
+
         serializer = self.get_serializer(sale)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -327,6 +335,13 @@ class LoanViewSet(SoftDeleteModelViewSet):
             
             sale.save()
         
+        Payment.objects.create(
+            customer=loan.customer,
+            client_name=loan.customer.name,
+            amount=payment,
+            payment_type='LOAN_PAYMENT'
+        )
+
         # Update the loan itself
         if payment >= loan.total_debt:
             loan.total_debt = Decimal('0.00')
@@ -467,3 +482,10 @@ class RevenueReportView(views.APIView):
             return response
 
         return Response(company_stats)
+
+
+class PaymentViewSet(SoftDeleteModelViewSet):
+    queryset = Payment.objects.all().order_by('-date')
+    serializer_class = PaymentSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['payment_type', 'customer']

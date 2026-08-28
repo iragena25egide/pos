@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Company, Product, Customer, Sale, SaleItem, Loan
+from .models import User, Company, Product, Customer, Sale, SaleItem, Loan, Payment
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 User = get_user_model()
@@ -57,4 +57,12 @@ class LoanSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Loan
+        fields = '__all__'
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+
+    class Meta:
+        model = Payment
         fields = '__all__'
