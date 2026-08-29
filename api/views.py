@@ -126,7 +126,8 @@ class SaleViewSet(SoftDeleteModelViewSet):
         customer_name = request.data.get('customer_name')
         customer_address = request.data.get('customer_address')
         items_data = request.data.get('items', [])
-        payment_amount = Decimal(request.data.get('payment_amount', '0.00'))
+        payment_amount = Decimal(str(request.data.get('payment_amount', '0.00')))
+        discount_amount = Decimal(str(request.data.get('discount_amount', '0.00')))
         confirm_loan = request.data.get('confirm_loan', False)
 
         if not items_data:
@@ -134,8 +135,10 @@ class SaleViewSet(SoftDeleteModelViewSet):
 
         total_amount = Decimal('0.00')
         for item in items_data:
-            total_amount += Decimal(item['quantity']) * Decimal(item['unit_price'])
+            total_amount += Decimal(str(item['quantity'])) * Decimal(str(item['unit_price']))
 
+        # Apply discount
+        total_amount = max(Decimal('0.00'), total_amount - discount_amount)
         balance = total_amount - payment_amount
 
         if customer_id:
