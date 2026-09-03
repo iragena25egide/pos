@@ -46,6 +46,7 @@ class SaleItemSerializer(serializers.ModelSerializer):
 class SaleSerializer(serializers.ModelSerializer):
     items = SaleItemSerializer(many=True, read_only=True)
     customer_name = serializers.CharField(source='customer.name', read_only=True)
+    remaining_debt = serializers.DecimalField(source='customer.loan.total_debt', max_digits=12, decimal_places=2, read_only=True, required=False, allow_null=True)
     salesperson_name = serializers.CharField(source='user.username', read_only=True)
 
     class Meta:
@@ -54,6 +55,7 @@ class SaleSerializer(serializers.ModelSerializer):
 
 class LoanSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
+    remaining_debt = serializers.DecimalField(source='customer.loan.total_debt', max_digits=12, decimal_places=2, read_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Loan
@@ -62,6 +64,7 @@ class LoanSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
+    remaining_debt = serializers.DecimalField(source='customer.loan.total_debt', max_digits=12, decimal_places=2, read_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Payment
