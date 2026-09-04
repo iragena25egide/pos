@@ -51,7 +51,7 @@ class SaleSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sale
-        fields = ['id', 'customer', 'customer_name', 'user', 'salesperson_name', 'total_amount', 'payment_amount', 'balance', 'created_at', 'items']
+        fields = ['id', 'customer', 'customer_name', 'user', 'salesperson_name', 'total_amount', 'payment_amount', 'balance', 'created_at', 'items', 'remaining_debt']
 
 class LoanSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source='customer.name', read_only=True)
