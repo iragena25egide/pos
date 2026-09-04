@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, views, filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum, Count, F
@@ -31,11 +31,11 @@ class SoftDeleteModelViewSet(viewsets.ModelViewSet):
         try:
             instance = self.queryset.model.objects.get(pk=pk)
             instance.restore()
-            return Response({'status': 'restored'})
+            return Response({'status': 'restored'}, headers={'message': 'Item restored successfully.'})
         except self.queryset.model.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    @action(detail=True, methods=['delete'])
+    @action(detail=True, methods=['delete'], permission_classes=[IsAdminUser])
     def force_delete(self, request, pk=None):
         try:
             instance = self.queryset.model.objects.get(pk=pk)
