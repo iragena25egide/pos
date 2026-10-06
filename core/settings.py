@@ -31,6 +31,11 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
+# Google OAuth2
+GOOGLE_CLIENT_ID = os.environ.get(
+    'GOOGLE_CLIENT_ID', '552229655849-afoehos06ti14mds4c4ucfne5n8p7l81.apps.googleusercontent.com')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+
 
 # Application definition
 

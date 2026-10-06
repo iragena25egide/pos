@@ -8,9 +8,13 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 """
 
 import os
-
+import socketio
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
+django_asgi_app = get_asgi_application()
 
-application = get_asgi_application()
+from api.socket_server import sio
+
+# Mount Socket.IO onto ASGI application
+application = socketio.ASGIApp(sio, other_asgi_app=django_asgi_app)

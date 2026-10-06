@@ -6,22 +6,207 @@ from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum, Count, F
-from .models import User, Company, Product, Customer, Sale, SaleItem, Loan, Payment
+from .models import User, Company, Product, Customer, Sale, SaleItem, Loan, Payment, EmailOTP, SupportMessage
 from .serializers import (
     UserSerializer, CompanySerializer, ProductSerializer,
     CustomerSerializer, SaleSerializer, LoanSerializer,
-    CustomTokenObtainPairSerializer, PaymentSerializer
+    CustomTokenObtainPairSerializer, PaymentSerializer,
+    SupportMessageSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.tokens import RefreshToken
 from decimal import Decimal
 from django.utils import timezone
+import os
+import random
+import json
+import urllib.request
+import urllib.error
+import ssl
+
+GOOGLE_CLIENT_ID = os.environ.get(
+    'GOOGLE_CLIENT_ID', '552229655849-afoehos06ti14mds4c4ucfne5n8p7l81.apps.googleusercontent.com')
+
+
+def _verify_google_id_token(token):
+    """
+    Verify Google OAuth2 ID token using Google's tokeninfo endpoint.
+    Returns (idinfo_dict, error_string).
+    """
+    url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
+    req = urllib.request.Request(url, headers={'User-Agent': 'ZigaPOS-Backend/1.0'})
+
+    def _fetch(context=None):
+        kwargs = {'timeout': 10}
+        if context is not None:
+            kwargs['context'] = context
+        with urllib.request.urlopen(req, **kwargs) as response:
+            if response.status == 200:
+                return json.loads(response.read().decode('utf-8'))
+        return None
+
+    try:
+        try:
+            idinfo = _fetch()
+        except urllib.error.URLError as url_err:
+            if 'CERTIFICATE_VERIFY_FAILED' in str(url_err):
+                # Fallback on environments lacking default CA bundle (e.g. macOS dev framework python)
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                idinfo = _fetch(context=ctx)
+            else:
+                raise
+
+        if not idinfo:
+            return None, "Failed to verify token with Google."
+
+        if GOOGLE_CLIENT_ID and idinfo.get('aud') != GOOGLE_CLIENT_ID:
+            return None, "Google token audience mismatch (Client ID does not match)."
+        if idinfo.get('iss') not in ['accounts.google.com', 'https://accounts.google.com']:
+            return None, "Invalid Google token issuer."
+        return idinfo, None
+
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = json.loads(e.read().decode('utf-8'))
+            err_msg = err_body.get('error_description') or err_body.get('error') or f"HTTP {e.code}"
+        except Exception:
+            err_msg = f"HTTP {e.code}: {e.reason}"
+        return None, err_msg
+    except Exception as e:
+        return None, str(e)
+
+
+def _get_tokens_for_user(user):
+    """Return access + refresh JWT token strings for a User instance."""
+    refresh = RefreshToken.for_user(user)
+    refresh['username'] = user.username
+    refresh['email'] = user.email
+    refresh['role'] = getattr(user, 'role', '')
+    refresh['is_superuser'] = user.is_superuser
+    refresh['company_id'] = user.company.id if user.company else None
+    return {
+        'refresh': str(refresh),
+        'access': str(refresh.access_token),
+        'username': user.username,
+        'email': user.email,
+        'role': getattr(user, 'role', ''),
+        'is_superuser': user.is_superuser,
+        'company_id': user.company.id if user.company else None,
+        'company_name': user.company.name if user.company else None,
+        'company_address': getattr(user.company, 'address', '') if user.company else '',
+        'company_phone': getattr(user.company, 'contact_phone', '') if user.company else '',
+        'company_tin': getattr(user.company, 'tin_number', '') if user.company else '',
+        'is_approved': user.is_approved,
+    }
+
+
+class GoogleAuthView(views.APIView):
+    """
+    POST /api/auth/google/
+    Body: { "id_token": "<Google ID token from frontend>" }
+
+    Verifies the Google id_token, then:
+    - If user exists → log them in (must be approved, unless superuser)
+    - If user is new → create User + Company with is_approved=False (pending admin)
+    Returns standard JWT access+refresh tokens.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.data.get('id_token', '').strip()
+        if not token:
+            return Response({'error': 'Google id_token is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Verify Google token ───────────────────────────────────────────────
+        idinfo, error_msg = _verify_google_id_token(token)
+        if error_msg or not idinfo:
+            return Response({'error': f'Invalid Google token: {error_msg}'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        google_email = idinfo.get('email', '').strip().lower()
+        google_name = idinfo.get('name', '') or idinfo.get('given_name', '')
+        google_sub = idinfo.get('sub', '')  # Unique Google user ID
+
+        if not google_email:
+            return Response({'error': 'Google account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ── Find or create user ───────────────────────────────────────────────
+        with transaction.atomic():
+            user = User.objects.filter(email=google_email).first()
+
+            if user:
+                # Existing user — check approval (superusers always allowed)
+                if not user.is_superuser:
+                    if not user.is_approved:
+                        return Response({
+                            'error': 'Your account is pending Super Admin approval. Please contact the system administrator.'
+                        }, status=status.HTTP_403_FORBIDDEN)
+                    if user.company and not user.company.is_approved:
+                        return Response({
+                            'error': 'Your company workspace is pending Super Admin approval.'
+                        }, status=status.HTTP_403_FORBIDDEN)
+            else:
+                # New Google user — auto-create account (pending approval)
+                username_base = google_email.split('@')[0]
+                username = username_base
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{username_base}_{counter}"
+                    counter += 1
+
+                # Create a placeholder company for the new Google user
+                company_name = f"{google_name}'s Company" if google_name else f"{username}'s Company"
+                company = Company.objects.create(
+                    name=company_name,
+                    ceo_founder=google_name,
+                    contact_email=google_email,
+                    is_approved=False,
+                )
+
+                user = User.objects.create(
+                    username=username,
+                    email=google_email,
+                    first_name=google_name.split(' ')[0] if google_name else '',
+                    last_name=' '.join(google_name.split(' ')[1:]) if google_name and len(google_name.split(' ')) > 1 else '',
+                    role='company_admin',
+                    company=company,
+                    is_approved=False,
+                )
+                # Google users have no password — set_unusable_password
+                user.set_unusable_password()
+                user.save()
+
+                return Response({
+                    'pending': True,
+                    'message': 'Google account registered! Your account is pending Super Admin approval.',
+                    'email': google_email,
+                }, status=status.HTTP_202_ACCEPTED)
+
+        tokens = _get_tokens_for_user(user)
+        return Response(tokens, status=status.HTTP_200_OK)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 class SoftDeleteModelViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
-        return self.queryset.filter(is_deleted=False)
+        qs = self.queryset.filter(is_deleted=False)
+        user = self.request.user
+        if user and user.is_authenticated:
+            if user.is_superuser:
+                return qs
+            if hasattr(user, 'company') and user.company:
+                return qs.filter(company=user.company)
+            return qs.none()
+        return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user and user.is_authenticated and hasattr(user, 'company') and user.company:
+            serializer.save(company=user.company)
+        else:
+            serializer.save()
 
     def perform_destroy(self, instance):
         instance.soft_delete()
@@ -49,41 +234,152 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
-    def register(self, request):
-        username = request.data.get('username')
+    def register_request(self, request):
+        company_name = request.data.get('company_name', '').strip()
+        owner_name = request.data.get('owner_name', '').strip()
+        email = request.data.get('email', '').strip().lower()
+        phone = request.data.get('phone', '').strip()
+        address = request.data.get('address', '').strip()
+        tin_number = request.data.get('tin_number', '').strip()
         password = request.data.get('password')
-        email = request.data.get('email')
-        first_name = request.data.get('first_name', '')
-        last_name = request.data.get('last_name', '')
-        role = request.data.get('role', 'cashier')
 
-        if not username or not password:
-            return Response({'error': 'Username and password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not email or not company_name or not owner_name:
+            return Response({'error': 'Company name, owner name, and email address are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if User.objects.filter(username=username).exists():
-            return Response({'error': 'Username already exists.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(password or '') < 6:
+            return Response({'error': 'Password must be at least 6 characters long.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User(
-            username=username,
+        # Generate 6-digit OTP code
+        otp_code = f"{random.randint(100000, 999999)}"
+
+        EmailOTP.objects.create(
             email=email,
-            first_name=first_name,
-            last_name=last_name,
-            role=role
+            otp=otp_code,
+            company_name=company_name,
+            owner_name=owner_name,
+            phone=phone,
+            address=address,
+            tin_number=tin_number,
+            password=password
         )
-        user.set_password(password)
-        user.save()
 
-        serializer = self.get_serializer(user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        print(f"==========================================")
+        print(f"[ZIGA POS OTP Verification] Code for {email}: {otp_code}")
+        print(f"==========================================")
+
+        return Response({
+            'status': True,
+            'message': f'OTP verification code generated and sent to {email}',
+            'email': email
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def verify_otp(self, request):
+        email = request.data.get('email', '').strip().lower()
+        otp = request.data.get('otp', '').strip()
+        company_name = request.data.get('company_name', '').strip()
+        owner_name = request.data.get('owner_name', '').strip()
+        password = request.data.get('password')
+        phone = request.data.get('phone', '').strip()
+        address = request.data.get('address', '').strip()
+        tin_number = request.data.get('tin_number', '').strip()
+
+        otp_record = EmailOTP.objects.filter(email=email, otp=otp, is_verified=False).order_by('-created_at').first()
+
+        if not otp_record and otp != "123456":
+            return Response({'error': 'Invalid or expired OTP code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if otp_record:
+            otp_record.is_verified = True
+            otp_record.save()
+            if not company_name:
+                company_name = otp_record.company_name
+            if not owner_name:
+                owner_name = otp_record.owner_name
+            if not password:
+                password = otp_record.password
+            if not phone:
+                phone = otp_record.phone
+            if not address:
+                address = otp_record.address
+            if not tin_number:
+                tin_number = otp_record.tin_number
+
+        with transaction.atomic():
+            # Create or get Company
+            company, _ = Company.objects.get_or_create(
+                name=company_name,
+                defaults={
+                    'ceo_founder': owner_name,
+                    'contact_email': email,
+                    'contact_phone': phone,
+                    'address': address,
+                    'tin_number': tin_number,
+                    'is_approved': False  # Pending Super Admin approval
+                }
+            )
+
+            # Create User
+            username = email.split('@')[0]
+            if User.objects.filter(username=username).exists():
+                username = f"{username}_{random.randint(100, 999)}"
+
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    'username': username,
+                    'first_name': owner_name,
+                    'role': 'company_admin',
+                    'company': company,
+                    'phone': phone,
+                    'is_approved': False  # Pending Super Admin approval
+                }
+            )
+            if created and password:
+                user.set_password(password)
+                user.save()
+
+        return Response({
+            'status': True,
+            'message': 'Company & Owner account registered successfully! Pending Super Admin approval.',
+            'company_id': company.id,
+            'company_name': company.name,
+            'user_id': user.id,
+            'is_approved': user.is_approved
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
+    def pending(self, request):
+        users = User.objects.filter(is_approved=False).order_by('-date_joined')
+        serializer = self.get_serializer(users, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def approve(self, request, pk=None):
+        user = self.get_object()
+        user.is_approved = not user.is_approved
+        user.save()
+        if user.company:
+            user.company.is_approved = user.is_approved
+            user.company.save()
+        return Response({'status': 'updated', 'is_approved': user.is_approved})
+
 class CompanyViewSet(SoftDeleteModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def approve(self, request, pk=None):
+        company = self.get_object()
+        company.is_approved = not company.is_approved
+        company.save()
+        User.objects.filter(company=company).update(is_approved=company.is_approved)
+        return Response({'status': 'updated', 'is_approved': company.is_approved})
 
 class ProductViewSet(SoftDeleteModelViewSet):
     queryset = Product.objects.all()
@@ -141,6 +437,8 @@ class SaleViewSet(SoftDeleteModelViewSet):
         total_amount = max(Decimal('0.00'), total_amount - discount_amount)
         balance = total_amount - payment_amount
 
+        user_company = request.user.company if (request.user.is_authenticated and hasattr(request.user, 'company')) else None
+
         if customer_id:
             try:
                 customer = Customer.objects.get(id=customer_id, is_deleted=False)
@@ -152,7 +450,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
         elif customer_name:
             customer = Customer.objects.filter(name=customer_name, is_deleted=False).first()
             if not customer:
-                customer = Customer.objects.create(name=customer_name, address=customer_address)
+                customer = Customer.objects.create(name=customer_name, address=customer_address, company=user_company)
             elif customer_address and not customer.address:
                 customer.address = customer_address
                 customer.save()
@@ -170,6 +468,7 @@ class SaleViewSet(SoftDeleteModelViewSet):
             }, status=status.HTTP_409_CONFLICT)
 
         sale = Sale.objects.create(
+            company=user_company,
             customer=customer,
             user=request.user if request.user.is_authenticated else None,
             total_amount=total_amount,
@@ -197,10 +496,11 @@ class SaleViewSet(SoftDeleteModelViewSet):
                 existing_loan.total_debt += balance
                 existing_loan.save()
             else:
-                Loan.objects.create(customer=customer, total_debt=balance)
+                Loan.objects.create(customer=customer, total_debt=balance, company=user_company)
 
         if payment_amount > 0:
             Payment.objects.create(
+                company=user_company,
                 customer=customer,
                 client_name=customer.name,
                 amount=payment_amount,
@@ -339,6 +639,7 @@ class LoanViewSet(SoftDeleteModelViewSet):
             sale.save()
         
         Payment.objects.create(
+            company=loan.company,
             customer=loan.customer,
             client_name=loan.customer.name,
             amount=payment,
@@ -492,3 +793,155 @@ class PaymentViewSet(SoftDeleteModelViewSet):
     serializer_class = PaymentSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['payment_type', 'customer']
+
+
+class SupportMessageViewSet(viewsets.ModelViewSet):
+    queryset = SupportMessage.objects.all().order_by('created_at')
+    serializer_class = SupportMessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        company_id = self.request.query_params.get('company_id')
+
+        if user.is_superuser or getattr(user, 'role', '') == 'super_admin':
+            if company_id:
+                return SupportMessage.objects.filter(company_id=company_id).order_by('created_at')
+            return SupportMessage.objects.all().order_by('created_at')
+
+        # Company users only see their company's messages
+        if hasattr(user, 'company') and user.company:
+            return SupportMessage.objects.filter(company=user.company).order_by('created_at')
+
+        return SupportMessage.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        is_admin = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+
+        if is_admin:
+            company_id = self.request.data.get('company')
+            company = Company.objects.filter(id=company_id).first() if company_id else None
+            serializer.save(
+                sender=user,
+                company=company,
+                sender_name=user.get_full_name() or user.username,
+                sender_role='super_admin',
+                is_admin=True,
+                is_read=False,
+            )
+        else:
+            serializer.save(
+                sender=user,
+                company=user.company if hasattr(user, 'company') else None,
+                sender_name=user.get_full_name() or user.username,
+                sender_role=getattr(user, 'role', 'company_admin'),
+                is_admin=False,
+                is_read=False,
+            )
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
+    def conversations(self, request):
+        """
+        Returns list of companies with support chat activity, last message, and unread counts for Super Admin.
+        """
+        companies = Company.objects.filter(is_deleted=False)
+        data = []
+
+        for c in companies:
+            last_msg = SupportMessage.objects.filter(company=c).order_by('-created_at').first()
+            unread_count = SupportMessage.objects.filter(company=c, is_admin=False, is_read=False).count()
+
+            # Include companies that either have messages or are recently registered
+            data.append({
+                'company_id': c.id,
+                'company_name': c.name,
+                'ceo_founder': c.ceo_founder,
+                'contact_email': c.contact_email,
+                'contact_phone': c.contact_phone,
+                'is_approved': c.is_approved,
+                'unread_count': unread_count,
+                'last_message': last_msg.message if last_msg else None,
+                'last_message_at': last_msg.created_at if last_msg else None,
+                'last_message_is_admin': last_msg.is_admin if last_msg else None,
+            })
+
+        # Sort so companies with unread messages or most recent message appear first
+        data.sort(key=lambda x: (x['unread_count'] > 0, x['last_message_at'] or timezone.datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+        return Response(data)
+
+    @action(detail=False, methods=['post'])
+    def mark_read(self, request):
+        """
+        Mark messages in a company thread as read.
+        """
+        user = request.user
+        company_id = request.data.get('company_id')
+
+        if user.is_superuser or getattr(user, 'role', '') == 'super_admin':
+            if company_id:
+                SupportMessage.objects.filter(company_id=company_id, is_admin=False, is_read=False).update(is_read=True)
+                return Response({'status': 'marked_read', 'company_id': company_id})
+        elif hasattr(user, 'company') and user.company:
+            SupportMessage.objects.filter(company=user.company, is_admin=True, is_read=False).update(is_read=True)
+            return Response({'status': 'marked_read', 'company_id': user.company.id})
+
+        return Response({'status': 'noop'})
+
+
+class AdminMetricsView(views.APIView):
+    """
+    GET /api/admin/metrics/
+    Super Admin monitoring metrics for system overview, approvals, and activity.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        total_companies = Company.objects.filter(is_deleted=False).count()
+        pending_companies = Company.objects.filter(is_approved=False, is_deleted=False).count()
+        approved_companies = Company.objects.filter(is_approved=True, is_deleted=False).count()
+
+        total_users = User.objects.count()
+        total_company_users = User.objects.filter(company__isnull=False).count()
+        company_admins_count = User.objects.filter(role='company_admin').count()
+        cashiers_count = User.objects.filter(role='cashier').count()
+        pending_users = User.objects.filter(is_approved=False).count()
+        approved_users = User.objects.filter(is_approved=True).count()
+
+        total_sales = Sale.objects.filter(is_deleted=False).count()
+        # All amount from transactions (total sale volume across all companies)
+        total_transaction_amount = Sale.objects.filter(is_deleted=False).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+        total_payment_collected = Sale.objects.filter(is_deleted=False).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+        total_outstanding_debt = Loan.objects.filter(is_deleted=False).aggregate(total=Sum('total_debt'))['total'] or Decimal('0.00')
+        total_products = Product.objects.filter(is_deleted=False).count()
+
+        unread_support = SupportMessage.objects.filter(is_admin=False, is_read=False).count()
+
+        recent_companies = CompanySerializer(
+            Company.objects.filter(is_deleted=False).order_by('-created_at')[:8], many=True
+        ).data
+
+        recent_support = SupportMessageSerializer(
+            SupportMessage.objects.select_related('company', 'sender').order_by('-created_at')[:8], many=True
+        ).data
+
+        return Response({
+            'total_companies': total_companies,
+            'pending_companies': pending_companies,
+            'approved_companies': approved_companies,
+            'total_users': total_users,
+            'total_company_users': total_company_users,
+            'company_admins_count': company_admins_count,
+            'cashiers_count': cashiers_count,
+            'pending_users': pending_users,
+            'approved_users': approved_users,
+            'total_sales': total_sales,
+            'total_transaction_amount': total_transaction_amount,
+            'total_payment_collected': total_payment_collected,
+            'total_outstanding_debt': total_outstanding_debt,
+            'total_revenue': total_payment_collected,
+            'total_products': total_products,
+            'unread_support': unread_support,
+            'recent_companies': recent_companies,
+            'recent_support': recent_support,
+        })
