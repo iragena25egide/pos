@@ -17,6 +17,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from decimal import Decimal
 from django.utils import timezone
+from .email_service import send_otp_email
 import os
 import random
 import json
@@ -263,13 +264,53 @@ class UserViewSet(viewsets.ModelViewSet):
             password=password
         )
 
-        print(f"==========================================")
-        print(f"[ZIGA POS OTP Verification] Code for {email}: {otp_code}")
-        print(f"==========================================")
+        # Dispatch branded verification email via Resend
+        send_otp_email(
+            to_email=email,
+            otp_code=otp_code,
+            owner_name=owner_name,
+            company_name=company_name
+        )
 
         return Response({
             'status': True,
             'message': f'OTP verification code generated and sent to {email}',
+            'email': email
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def resend_otp(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Find latest pending registration attempt for this email
+        latest_record = EmailOTP.objects.filter(email=email, is_verified=False).order_by('-created_at').first()
+        if not latest_record:
+            return Response({'error': 'No pending registration request found for this email.'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_otp = f"{random.randint(100000, 999999)}"
+        EmailOTP.objects.create(
+            email=email,
+            otp=new_otp,
+            company_name=latest_record.company_name,
+            owner_name=latest_record.owner_name,
+            phone=latest_record.phone,
+            address=latest_record.address,
+            tin_number=latest_record.tin_number,
+            password=latest_record.password
+        )
+
+        send_otp_email(
+            to_email=email,
+            otp_code=new_otp,
+            owner_name=latest_record.owner_name or 'Store Owner',
+            company_name=latest_record.company_name or 'Ziga POS'
+        )
+
+        return Response({
+            'status': True,
+            'message': f'A fresh OTP code has been sent to {email}',
             'email': email
         }, status=status.HTTP_200_OK)
 
