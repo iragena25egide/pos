@@ -207,6 +207,10 @@ class SoftDeleteModelViewSet(viewsets.ModelViewSet):
         if user and user.is_authenticated:
             if user.is_superuser:
                 return qs
+            if qs.model == Company:
+                if hasattr(user, 'company') and user.company:
+                    return qs.filter(id=user.company.id)
+                return qs.all()
             if hasattr(user, 'company') and user.company:
                 return qs.filter(company=user.company)
             return qs.none()
@@ -214,7 +218,9 @@ class SoftDeleteModelViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user and user.is_authenticated and hasattr(user, 'company') and user.company:
+        if self.queryset.model == Company:
+            serializer.save()
+        elif user and user.is_authenticated and hasattr(user, 'company') and user.company:
             serializer.save(company=user.company)
         else:
             serializer.save()
@@ -440,6 +446,20 @@ class UserViewSet(viewsets.ModelViewSet):
 class CompanyViewSet(SoftDeleteModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
+
+    def get_queryset(self):
+        qs = Company.objects.filter(is_deleted=False)
+        user = self.request.user
+        if user and user.is_authenticated:
+            if user.is_superuser:
+                return qs
+            if hasattr(user, 'company') and user.company:
+                return qs.filter(id=user.company.id)
+            return qs.all()
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save()
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):

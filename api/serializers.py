@@ -55,16 +55,25 @@ class CompanySerializer(serializers.ModelSerializer):
         }
 
     def get_users_count(self, obj):
-        return obj.users.count()
+        try:
+            return obj.users.count()
+        except Exception:
+            return 0
 
     def get_total_transactions_amount(self, obj):
-        from decimal import Decimal
-        from django.db.models import Sum
-        val = obj.sales.filter(is_deleted=False).aggregate(total=Sum('total_amount'))['total']
-        return str(val or Decimal('0.00'))
+        try:
+            from decimal import Decimal
+            from django.db.models import Sum
+            val = obj.sales.filter(is_deleted=False).aggregate(total=Sum('total_amount'))['total']
+            return str(val or Decimal('0.00'))
+        except Exception:
+            return "0.00"
 
     def get_total_sales_count(self, obj):
-        return obj.sales.filter(is_deleted=False).count()
+        try:
+            return obj.sales.filter(is_deleted=False).count()
+        except Exception:
+            return 0
 
 class ProductSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
