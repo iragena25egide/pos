@@ -234,6 +234,23 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def get_queryset(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return User.objects.none()
+        if user.is_superuser or getattr(user, 'role', '') == 'super_admin':
+            return User.objects.all().order_by('-date_joined')
+        # Regular users/cashiers can only see their own record
+        return User.objects.filter(id=user.id)
+
+    def get_permissions(self):
+        if self.action in ['register_request', 'resend_otp', 'verify_otp']:
+            return [AllowAny()]
+        if self.action in ['list', 'retrieve', 'me']:
+            return [IsAuthenticated()]
+        # Creating, updating, deleting, suspending other users requires Super Admin
+        return [IsAdminUser()]
+
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
     def register_request(self, request):
         company_name = request.data.get('company_name', '').strip()
