@@ -97,7 +97,7 @@ async def send_message(sid, data):
     Handles inbound messages from either company user or admin.
     Broadcasts in real-time to both the company room and the admin support room.
     """
-    company_id = data.get('company_id')
+    company_id = data.get('company_id') or data.get('company')
     message = data.get('message', '').strip()
     sender_name = data.get('sender_name', 'User')
     sender_role = data.get('sender_role', 'company_admin')

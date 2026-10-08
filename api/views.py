@@ -910,6 +910,10 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
         if hasattr(user, 'company') and user.company:
             return SupportMessage.objects.filter(company=user.company).order_by('created_at')
 
+        company_id = company_id or self.request.headers.get('X-Company-ID')
+        if company_id:
+            return SupportMessage.objects.filter(company_id=company_id).order_by('created_at')
+
         return SupportMessage.objects.none()
 
     def perform_create(self, serializer):
@@ -917,7 +921,7 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
         is_admin = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
 
         if is_admin:
-            company_id = self.request.data.get('company')
+            company_id = self.request.data.get('company') or self.request.data.get('company_id')
             company = Company.objects.filter(id=company_id).first() if company_id else None
             instance = serializer.save(
                 sender=user,
@@ -928,9 +932,14 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
                 is_read=False,
             )
         else:
+            company = getattr(user, 'company', None)
+            if not company:
+                company_id = self.request.data.get('company') or self.request.data.get('company_id')
+                if company_id:
+                    company = Company.objects.filter(id=company_id).first()
             instance = serializer.save(
                 sender=user,
-                company=user.company if hasattr(user, 'company') else None,
+                company=company,
                 sender_name=user.get_full_name() or user.username,
                 sender_role=getattr(user, 'role', 'company_admin'),
                 is_admin=False,
