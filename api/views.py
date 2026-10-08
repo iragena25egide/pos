@@ -456,6 +456,31 @@ class ProductViewSet(SoftDeleteModelViewSet):
     filterset_fields = ['company']
     search_fields = ['name', 'description']
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        company = getattr(user, 'company', None)
+
+        # If user has no assigned company, check request payload or auto-create/fallback to user's first store
+        if not company:
+            company_id = self.request.data.get('company')
+            if company_id:
+                company = Company.objects.filter(id=company_id).first()
+
+        if not company:
+            # Fallback: get first available company or create default for user
+            company = Company.objects.first()
+            if not company:
+                company = Company.objects.create(
+                    name=f"{user.username}'s Business",
+                    ceo_founder=user.get_full_name() or user.username,
+                    is_approved=True,
+                )
+            if user and user.is_authenticated and not user.company:
+                user.company = company
+                user.save(update_fields=['company'])
+
+        serializer.save(company=company)
+
 class CustomerViewSet(SoftDeleteModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
