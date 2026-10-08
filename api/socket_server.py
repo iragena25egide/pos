@@ -78,6 +78,16 @@ async def join_admin(sid, data=None):
 
 
 @sio.event
+async def join_admin_hub(sid, data=None):
+    """
+    Alias for join_admin
+    """
+    await sio.enter_room(sid, "admin_support")
+    logger.info(f"[Socket.IO] Admin sid {sid} joined admin_support room via join_admin_hub")
+    await sio.emit('joined_room', {'room': 'admin_support', 'status': 'connected'}, to=sid)
+
+
+@sio.event
 async def send_message(sid, data):
     """
     Handles inbound messages from either company user or admin.
