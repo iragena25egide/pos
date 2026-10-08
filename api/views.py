@@ -908,7 +908,7 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
             })
 
         # Sort so companies with unread messages or most recent message appear first
-        data.sort(key=lambda x: (x['unread_count'] > 0, x['last_message_at'] or timezone.datetime.min.replace(tzinfo=timezone.utc)), reverse=True)
+        data.sort(key=lambda x: (x['unread_count'] > 0, x['last_message_at'].isoformat() if x['last_message_at'] else ''), reverse=True)
         return Response(data)
 
     @action(detail=False, methods=['post'])
