@@ -26,23 +26,11 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if self.user.company and not self.user.company.is_approved:
                 raise serializers.ValidationError({"detail": "Your company workspace is pending Super Admin approval."})
 
-        data['username'] = self.user.username
-        data['email'] = self.user.email
-        data['role'] = getattr(self.user, 'role', '')
-        data['is_superuser'] = self.user.is_superuser
-        if self.user.company:
-            data['company_id'] = self.user.company.id
-            data['company_name'] = self.user.company.name
-            data['company_address'] = self.user.company.address or ''
-            data['company_phone'] = self.user.company.contact_phone or ''
-            data['company_tin'] = self.user.company.tin_number or ''
-        else:
-            data['company_id'] = None
-            data['company_name'] = None
-            data['company_address'] = ''
-            data['company_phone'] = ''
-            data['company_tin'] = ''
-        return data
+        # Return only standard JWT authentication tokens without leaking sensitive company/user fields
+        return {
+            'access': data['access'],
+            'refresh': data['refresh'],
+        }
 
     @classmethod
     def get_token(cls, user):
@@ -165,11 +153,25 @@ class PaymentSerializer(serializers.ModelSerializer):
 
 class SupportMessageSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
+    company_id = serializers.IntegerField(source='company.id', read_only=True)
+    attachment_url = serializers.SerializerMethodField()
 
     class Meta:
         model = SupportMessage
         fields = [
-            'id', 'company', 'company_name', 'sender', 'sender_name',
-            'sender_role', 'message', 'is_admin', 'is_read', 'created_at'
+            'id', 'company', 'company_id', 'company_name', 'sender', 'sender_name',
+            'sender_role', 'message', 'attachment', 'attachment_url',
+            'is_admin', 'is_read', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'company_name']
+        read_only_fields = ['id', 'company_id', 'created_at', 'updated_at', 'company_name', 'attachment_url']
+
+    def get_attachment_url(self, obj):
+        if obj.attachment:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.attachment.url)
+            url = obj.attachment.url
+            if url.startswith('http://') or url.startswith('https://'):
+                return url
+            return f"https://194.164.72.181.nip.io{url}" if url.startswith('/') else f"https://194.164.72.181.nip.io/{url}"
+        return None

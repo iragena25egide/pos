@@ -3,7 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from django.db import transaction
 from django.db.models import Sum, Count, F
 from .models import User, Company, Product, Customer, Sale, SaleItem, Loan, Payment, EmailOTP, SupportMessage
@@ -132,6 +132,11 @@ class GoogleAuthView(views.APIView):
         if not google_email:
             return Response({'error': 'Google account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ── Optional company parameters for first-time onboarding ────────────
+        company_name_input = request.data.get('company_name', '').strip()
+        company_address_input = request.data.get('address', '').strip()
+        company_tin_input = request.data.get('tin_number', '').strip()
+
         # ── Find or create user ───────────────────────────────────────────────
         with transaction.atomic():
             user = User.objects.filter(email=google_email).first()
@@ -156,12 +161,14 @@ class GoogleAuthView(views.APIView):
                     username = f"{username_base}_{counter}"
                     counter += 1
 
-                # Create a placeholder company for the new Google user
-                company_name = f"{google_name}'s Company" if google_name else f"{username}'s Company"
+                # Create company with user-provided details (for thermal receipts)
+                company_name = company_name_input or (f"{google_name}'s Business" if google_name else f"{username}'s Store")
                 company = Company.objects.create(
                     name=company_name,
                     ceo_founder=google_name,
                     contact_email=google_email,
+                    address=company_address_input,
+                    tin_number=company_tin_input,
                     is_approved=False,
                 )
 
@@ -174,7 +181,6 @@ class GoogleAuthView(views.APIView):
                     company=company,
                     is_approved=False,
                 )
-                # Google users have no password — set_unusable_password
                 user.set_unusable_password()
                 user.save()
 
@@ -185,7 +191,11 @@ class GoogleAuthView(views.APIView):
                 }, status=status.HTTP_202_ACCEPTED)
 
         tokens = _get_tokens_for_user(user)
-        return Response(tokens, status=status.HTTP_200_OK)
+        # Return only access and refresh without leaking credentials or company data
+        return Response({
+            'access': tokens['access'],
+            'refresh': tokens['refresh']
+        }, status=status.HTTP_200_OK)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -745,17 +755,46 @@ class TrashView(views.APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class DashboardStatsView(views.APIView):
-    def get(self, request):
-        total_companies = Company.objects.filter(is_deleted=False).count()
-        total_products = Product.objects.filter(is_deleted=False).count()
-        total_customers = Customer.objects.filter(is_deleted=False).count()
-        total_sales = Sale.objects.filter(is_deleted=False).count()
-        
-        total_revenue = Sale.objects.filter(is_deleted=False).aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
-        total_outstanding_loans = Loan.objects.filter(is_deleted=False).aggregate(total=Sum('total_debt'))['total'] or Decimal('0.00')
+    permission_classes = [IsAuthenticated]
 
-        recent_sales = SaleSerializer(Sale.objects.select_related('customer', 'user').prefetch_related('items__product').filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
-        recent_loans = LoanSerializer(Loan.objects.select_related('customer').filter(is_deleted=False).order_by('-created_at')[:5], many=True).data
+    def get(self, request):
+        user = request.user
+        is_super = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+
+        companies_qs = Company.objects.filter(is_deleted=False)
+        products_qs = Product.objects.filter(is_deleted=False)
+        customers_qs = Customer.objects.filter(is_deleted=False)
+        sales_qs = Sale.objects.filter(is_deleted=False)
+        loans_qs = Loan.objects.filter(is_deleted=False)
+
+        if not is_super:
+            if hasattr(user, 'company') and user.company:
+                products_qs = products_qs.filter(company=user.company)
+                customers_qs = customers_qs.filter(company=user.company)
+                sales_qs = sales_qs.filter(company=user.company)
+                loans_qs = loans_qs.filter(company=user.company)
+            else:
+                products_qs = products_qs.none()
+                customers_qs = customers_qs.none()
+                sales_qs = sales_qs.none()
+                loans_qs = loans_qs.none()
+
+        total_companies = companies_qs.count() if is_super else 1
+        total_products = products_qs.count()
+        total_customers = customers_qs.count()
+        total_sales = sales_qs.count()
+
+        total_revenue = sales_qs.aggregate(total=Sum('payment_amount'))['total'] or Decimal('0.00')
+        total_outstanding_loans = loans_qs.aggregate(total=Sum('total_debt'))['total'] or Decimal('0.00')
+
+        recent_sales = SaleSerializer(
+            sales_qs.select_related('customer', 'user').prefetch_related('items__product').order_by('-created_at')[:5],
+            many=True
+        ).data
+        recent_loans = LoanSerializer(
+            loans_qs.select_related('customer').order_by('-created_at')[:5],
+            many=True
+        ).data
 
         return Response({
             'total_companies': total_companies,
@@ -880,7 +919,7 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
         if is_admin:
             company_id = self.request.data.get('company')
             company = Company.objects.filter(id=company_id).first() if company_id else None
-            serializer.save(
+            instance = serializer.save(
                 sender=user,
                 company=company,
                 sender_name=user.get_full_name() or user.username,
@@ -889,7 +928,7 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
                 is_read=False,
             )
         else:
-            serializer.save(
+            instance = serializer.save(
                 sender=user,
                 company=user.company if hasattr(user, 'company') else None,
                 sender_name=user.get_full_name() or user.username,
@@ -897,6 +936,39 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
                 is_admin=False,
                 is_read=False,
             )
+
+        # Broadcast real-time event
+        try:
+            from api.socket_server import broadcast_sync_message
+            broadcast_sync_message('new_message', SupportMessageSerializer(instance, context={'request': self.request}).data)
+        except Exception as e:
+            pass
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        is_admin = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+        if not is_admin and serializer.instance.is_admin:
+            raise PermissionDenied("You cannot modify support staff messages.")
+        instance = serializer.save()
+        try:
+            from api.socket_server import broadcast_sync_message
+            broadcast_sync_message('update_message', SupportMessageSerializer(instance, context={'request': self.request}).data)
+        except Exception:
+            pass
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        is_admin = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+        if not is_admin and instance.is_admin:
+            raise PermissionDenied("You cannot delete support staff messages.")
+        msg_id = instance.id
+        company_id = instance.company_id
+        instance.delete()
+        try:
+            from api.socket_server import broadcast_sync_message
+            broadcast_sync_message('delete_message', {'id': msg_id, 'company_id': company_id})
+        except Exception:
+            pass
 
     @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
     def conversations(self, request):

@@ -33,14 +33,18 @@ def _save_message_to_db(company_id, sender_name, sender_role, message, is_admin)
     )
     return {
         'id': msg.id,
+        'company': company.id if company else None,
         'company_id': company.id if company else None,
         'company_name': company.name if company else 'Global',
         'sender_name': msg.sender_name,
         'sender_role': msg.sender_role,
         'message': msg.message,
+        'attachment': None,
+        'attachment_url': None,
         'is_admin': msg.is_admin,
         'is_read': msg.is_read,
         'created_at': msg.created_at.isoformat(),
+        'updated_at': msg.updated_at.isoformat() if hasattr(msg, 'updated_at') and msg.updated_at else msg.created_at.isoformat(),
     }
 
 
@@ -146,3 +150,26 @@ async def broadcast_new_message(msg_data):
     if company_id:
         await sio.emit('new_message', msg_data, room=f"company_{company_id}")
     await sio.emit('new_message', msg_data, room="admin_support")
+
+
+def broadcast_sync_message(event_name, data):
+    """
+    Sync bridge for Django REST framework views to broadcast socket events
+    """
+    import asyncio
+    async def _emit():
+        company_id = (data.get('company_id') or data.get('company')) if isinstance(data, dict) else None
+        if company_id:
+            await sio.emit(event_name, data, room=f"company_{company_id}")
+        await sio.emit(event_name, data, room="admin_support")
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(_emit())
+        else:
+            loop.run_until_complete(_emit())
+    except RuntimeError:
+        asyncio.run(_emit())
+    except Exception as e:
+        logger.error(f"[Socket.IO] Broadcast error: {e}")

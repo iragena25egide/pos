@@ -186,10 +186,12 @@ class SupportMessage(models.Model):
         User, related_name='sent_support_messages', on_delete=models.SET_NULL, null=True, blank=True)
     sender_name = models.CharField(max_length=255)
     sender_role = models.CharField(max_length=50, default='company_admin')
-    message = models.TextField()
+    message = models.TextField(blank=True, default='')
+    attachment = models.FileField(upload_to='support_attachments/', null=True, blank=True)
     is_admin = models.BooleanField(default=False, db_index=True)
     is_read = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['created_at']
