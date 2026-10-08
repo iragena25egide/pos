@@ -164,7 +164,11 @@ class SupportMessageSerializer(serializers.ModelSerializer):
             'sender_role', 'message', 'attachment', 'attachment_url',
             'is_admin', 'is_read', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'company_id', 'created_at', 'updated_at', 'company_name', 'attachment_url']
+        read_only_fields = ['id', 'company_id', 'sender', 'sender_name', 'sender_role', 'is_admin', 'created_at', 'updated_at', 'company_name', 'attachment_url']
+        extra_kwargs = {
+            'company': {'required': False, 'allow_null': True},
+            'message': {'required': False, 'allow_blank': True},
+        }
 
     def get_attachment_url(self, obj):
         if obj.attachment:
