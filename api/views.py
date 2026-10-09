@@ -1170,6 +1170,30 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
 
         return Response({'status': 'noop'})
 
+    @action(detail=False, methods=['post', 'delete'], permission_classes=[IsAdminUser])
+    def clear_conversation(self, request):
+        """
+        Allows Super Admin to delete the entire chat history of a customer/company.
+        """
+        company_id = request.data.get('company_id') or request.query_params.get('company_id')
+        if not company_id:
+            return Response({'error': 'company_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        deleted_count, _ = SupportMessage.objects.filter(company_id=company_id).delete()
+
+        try:
+            from api.socket_server import broadcast_sync_message
+            broadcast_sync_message('conversation_cleared', {'company_id': int(company_id)})
+        except Exception:
+            pass
+
+        return Response({
+            'status': 'cleared',
+            'company_id': int(company_id),
+            'deleted_count': deleted_count,
+            'message': f'Entire chat history ({deleted_count} messages) deleted successfully.'
+        }, status=status.HTTP_200_OK)
+
 
 class AdminMetricsView(views.APIView):
     """
