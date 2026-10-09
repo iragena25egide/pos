@@ -870,32 +870,85 @@ class LoanViewSet(SoftDeleteModelViewSet):
             return Response({'message': 'Partial payment received.', 'status': loan.status, 'remaining_debt': loan.total_debt})
 
 class TrashView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
+        user = request.user
+        is_super = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+        company = getattr(user, 'company', None) if not is_super else None
+
+        company_id_param = request.query_params.get('company_id')
+        if is_super and company_id_param:
+            company = Company.objects.filter(id=company_id_param).first()
+
         def format_item(item, type_name):
+            comp = getattr(item, 'company', None)
+            comp_name = comp.name if comp else (getattr(item, 'name', '') if type_name == 'company' else 'General')
             return {
                 'id': item.id,
                 'type': type_name,
                 'name': str(item),
+                'company_id': comp.id if comp else None,
+                'company_name': comp_name,
                 'deleted_at': item.deleted_at
             }
-        
+
         trash = []
-        trash.extend([format_item(i, 'company') for i in Company.objects.filter(is_deleted=True)])
-        trash.extend([format_item(i, 'product') for i in Product.objects.filter(is_deleted=True)])
-        trash.extend([format_item(i, 'customer') for i in Customer.objects.filter(is_deleted=True)])
-        trash.extend([format_item(i, 'sale') for i in Sale.objects.filter(is_deleted=True)])
-        trash.extend([format_item(i, 'loan') for i in Loan.objects.filter(is_deleted=True)])
-        
+
+        # Only superusers without specific company filter see deleted companies
+        if is_super and not company:
+            trash.extend([format_item(i, 'company') for i in Company.objects.filter(is_deleted=True)])
+
+        sales_qs = Sale.objects.filter(is_deleted=True)
+        loans_qs = Loan.objects.filter(is_deleted=True)
+        products_qs = Product.objects.filter(is_deleted=True)
+        customers_qs = Customer.objects.filter(is_deleted=True)
+
+        if company:
+            sales_qs = sales_qs.filter(company=company)
+            loans_qs = loans_qs.filter(company=company)
+            products_qs = products_qs.filter(company=company)
+            customers_qs = customers_qs.filter(company=company)
+
+        trash.extend([format_item(i, 'sale') for i in sales_qs])
+        trash.extend([format_item(i, 'loan') for i in loans_qs])
+        trash.extend([format_item(i, 'product') for i in products_qs])
+        trash.extend([format_item(i, 'customer') for i in customers_qs])
+
         trash.sort(key=lambda x: x['deleted_at'] or timezone.now(), reverse=True)
         return Response(trash)
 
     def delete(self, request):
-        Company.objects.filter(is_deleted=True).delete()
-        Product.objects.filter(is_deleted=True).delete()
-        Customer.objects.filter(is_deleted=True).delete()
-        Sale.objects.filter(is_deleted=True).delete()
-        Loan.objects.filter(is_deleted=True).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        user = request.user
+        is_super = user.is_superuser or getattr(user, 'role', '') == 'super_admin'
+        company = getattr(user, 'company', None) if not is_super else None
+        item_type = request.query_params.get('type') or request.data.get('type')
+
+        if is_super and not company:
+            if not item_type or item_type == 'company':
+                Company.objects.filter(is_deleted=True).delete()
+
+        sales_qs = Sale.objects.filter(is_deleted=True)
+        loans_qs = Loan.objects.filter(is_deleted=True)
+        products_qs = Product.objects.filter(is_deleted=True)
+        customers_qs = Customer.objects.filter(is_deleted=True)
+
+        if company:
+            sales_qs = sales_qs.filter(company=company)
+            loans_qs = loans_qs.filter(company=company)
+            products_qs = products_qs.filter(company=company)
+            customers_qs = customers_qs.filter(company=company)
+
+        if not item_type or item_type == 'sale':
+            sales_qs.delete()
+        if not item_type or item_type == 'loan':
+            loans_qs.delete()
+        if not item_type or item_type == 'product':
+            products_qs.delete()
+        if not item_type or item_type == 'customer':
+            customers_qs.delete()
+
+        return Response({'message': 'Recycle bin emptied successfully.'}, status=status.HTTP_200_OK)
 
 class DashboardStatsView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -1132,9 +1185,12 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
 
         for c in companies:
             last_msg = SupportMessage.objects.filter(company=c).order_by('-created_at').first()
+            if not last_msg:
+                continue
+
             unread_count = SupportMessage.objects.filter(company=c, is_admin=False, is_read=False).count()
 
-            # Include companies that either have messages or are recently registered
+            # Include companies that have active support message history
             data.append({
                 'company_id': c.id,
                 'company_name': c.name,
@@ -1143,9 +1199,9 @@ class SupportMessageViewSet(viewsets.ModelViewSet):
                 'contact_phone': c.contact_phone,
                 'is_approved': c.is_approved,
                 'unread_count': unread_count,
-                'last_message': last_msg.message if last_msg else None,
-                'last_message_at': last_msg.created_at if last_msg else None,
-                'last_message_is_admin': last_msg.is_admin if last_msg else None,
+                'last_message': last_msg.message,
+                'last_message_at': last_msg.created_at,
+                'last_message_is_admin': last_msg.is_admin,
             })
 
         # Sort so companies with unread messages or most recent message appear first
