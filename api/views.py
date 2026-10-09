@@ -148,6 +148,25 @@ class GoogleAuthView(views.APIView):
                     user.set_password(password_input)
                     user.save(update_fields=['password'])
 
+                if user.company:
+                    if company_name_input:
+                        user.company.name = company_name_input
+                    if company_address_input:
+                        user.company.address = company_address_input
+                    if company_tin_input:
+                        user.company.tin_number = company_tin_input
+                    user.company.save()
+                elif company_name_input:
+                    user.company = Company.objects.create(
+                        name=company_name_input,
+                        ceo_founder=google_name or user.get_full_name(),
+                        contact_email=google_email,
+                        address=company_address_input,
+                        tin_number=company_tin_input,
+                        is_approved=user.is_approved,
+                    )
+                    user.save(update_fields=['company'])
+
                 # Existing user — check approval (superusers always allowed)
                 if not user.is_superuser:
                     if not user.is_approved:
