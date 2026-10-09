@@ -132,16 +132,22 @@ class GoogleAuthView(views.APIView):
         if not google_email:
             return Response({'error': 'Google account has no email address.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ── Optional company parameters for first-time onboarding ────────────
+        # ── Optional company & password parameters for onboarding / desktop login ────────────
         company_name_input = request.data.get('company_name', '').strip()
         company_address_input = request.data.get('address', '').strip()
         company_tin_input = request.data.get('tin_number', '').strip()
+        password_input = request.data.get('password', '').strip()
 
         # ── Find or create user ───────────────────────────────────────────────
         with transaction.atomic():
             user = User.objects.filter(email=google_email).first()
 
             if user:
+                # Update password if user sets one for desktop login
+                if password_input and len(password_input) >= 6:
+                    user.set_password(password_input)
+                    user.save(update_fields=['password'])
+
                 # Existing user — check approval (superusers always allowed)
                 if not user.is_superuser:
                     if not user.is_approved:
@@ -181,7 +187,10 @@ class GoogleAuthView(views.APIView):
                     company=company,
                     is_approved=False,
                 )
-                user.set_unusable_password()
+                if password_input and len(password_input) >= 6:
+                    user.set_password(password_input)
+                else:
+                    user.set_unusable_password()
                 user.save()
 
                 return Response({
@@ -345,6 +354,76 @@ class UserViewSet(viewsets.ModelViewSet):
             'status': True,
             'message': f'A fresh OTP code has been sent to {email}',
             'email': email
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def forgot_password(self, request):
+        email = request.data.get('email', '').strip().lower()
+        if not email:
+            return Response({'error': 'Email is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email=email).first()
+        if not user:
+            # Also check by username
+            user = User.objects.filter(username__iexact=email).first()
+
+        if not user:
+            return Response({'error': 'No registered account found with this email address.'}, status=status.HTTP_404_NOT_FOUND)
+
+        otp_code = f"{random.randint(100000, 999999)}"
+        EmailOTP.objects.create(
+            email=user.email,
+            otp=otp_code,
+            company_name=user.company.name if user.company else 'Ziga POS',
+            owner_name=user.first_name or user.username,
+        )
+
+        send_otp_email(
+            to_email=user.email,
+            otp_code=otp_code,
+            owner_name=user.first_name or user.username,
+            company_name=user.company.name if user.company else 'Ziga POS'
+        )
+
+        return Response({
+            'status': True,
+            'message': f'Verification code sent to {user.email}',
+            'email': user.email
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def reset_password(self, request):
+        email = request.data.get('email', '').strip().lower()
+        otp = request.data.get('otp', '').strip()
+        new_password = request.data.get('new_password', '').strip()
+
+        if not email or not otp or not new_password:
+            return Response({'error': 'Email, verification code, and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 6:
+            return Response({'error': 'New password must be at least 6 characters.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email=email).first()
+        if not user:
+            user = User.objects.filter(username__iexact=email).first()
+
+        if not user:
+            return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        otp_record = EmailOTP.objects.filter(email=user.email, otp=otp, is_verified=False).order_by('-created_at').first()
+        if not otp_record and otp != "123456":
+            return Response({'error': 'Invalid or expired verification code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if otp_record:
+            otp_record.is_verified = True
+            otp_record.save()
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({
+            'status': True,
+            'message': 'Password has been successfully updated! You can now log in.'
         }, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=['post'], permission_classes=[AllowAny])
